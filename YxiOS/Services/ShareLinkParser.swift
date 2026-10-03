@@ -48,7 +48,7 @@ public enum ShareLinkParser {
 
     /// 从一段 URL 中识别平台。
     public static func detectPlatform(from urlString: String) -> Platform? {
-        detect(in: urlString)?.platform
+        detect(in: urlString).map { $0.0 }
     }
 
     // MARK: - Detection
