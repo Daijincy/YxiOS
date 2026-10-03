@@ -73,6 +73,39 @@ enum HTTP {
             throw YxiOSError.message("网络请求失败：\(error.localizedDescription)")
         }
     }
+
+    /// 流式下载：把 URLSession 的逐字节 AsyncBytes（Element == UInt8）缓冲成
+    /// 约 64KB 一块的 Data 序列，便于直接 FileHandle.write(contentsOf:)。
+    /// 返回 (Data chunk 流, HTTPURLResponse)。
+    static func dataChunks(for request: URLRequest, chunkSize: Int = 64 * 1024)
+        async throws -> (AsyncThrowingStream<Data, Error>, HTTPURLResponse) {
+        let (bytes, resp) = try await session.bytes(for: request)
+        guard let http = resp as? HTTPURLResponse else {
+            throw YxiOSError.message("无效的网络响应")
+        }
+        let stream = AsyncThrowingStream<Data, Error> { continuation in
+            let producer = Task {
+                var buffer = Data()
+                do {
+                    for try await byte in bytes {
+                        buffer.append(byte)
+                        if buffer.count >= chunkSize {
+                            continuation.yield(buffer)
+                            buffer.removeAll(keepingCapacity: true)
+                        }
+                    }
+                    if !buffer.isEmpty {
+                        continuation.yield(buffer)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in producer.cancel() }
+        }
+        return (stream, http)
+    }
 }
 
 /// URL 拼接 / 表单编码工具。

@@ -298,10 +298,7 @@ public final class DownloadManager: ObservableObject {
             req.setValue("bytes=\(start)-\(end)", forHTTPHeaderField: "Range")
         }
 
-        let (bytes, resp) = try await HTTP.session.bytes(for: req)
-        guard let http = resp as? HTTPURLResponse else {
-            throw YxiOSError.message("无效的下载响应")
-        }
+        let (bytes, http) = try await HTTP.dataChunks(for: req)
         if http.statusCode == 200 {
             // 服务器忽略了 Range（整文件）
             rt.rangeIgnored += 1
@@ -372,7 +369,7 @@ public final class DownloadManager: ObservableObject {
         do {
             var req = URLRequest(url: rt.url)
             for (k, v) in rt.headers { req.setValue(v, forHTTPHeaderField: k) }
-            let (bytes, _) = try await HTTP.session.bytes(for: req)
+            let (bytes, _) = try await HTTP.dataChunks(for: req)
             for try await chunk in bytes {
                 if Task.isCancelled || rt.cancelled || rt.paused {
                     try? handle.close()

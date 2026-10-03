@@ -7,3 +7,6 @@ dist/
 
 ### macOS
 .DS_Store
+
+### Local build/debug logs
+docs/build-failed.log

@@ -122,28 +122,28 @@ public struct DownloadsView: View {
 
             HStack(spacing: 10) {
                 if task.status == .downloading {
-                    smallAction("暂停", systemImage: "pause.circle", role: .secondary) {
+                    smallAction("暂停", systemImage: "pause.circle", tint: .secondary) {
                         dm.pause(task.id)
                     }
                 }
                 if task.status == .queued || task.status == .paused {
-                    smallAction("继续", systemImage: "play.circle", role: .primary) {
+                    smallAction("继续", systemImage: "play.circle", tint: .blue) {
                         dm.resume(task.id)
                     }
                 }
                 if task.status == .failed {
-                    smallAction("重试", systemImage: "arrow.clockwise.circle", role: .primary) {
+                    smallAction("重试", systemImage: "arrow.clockwise.circle", tint: .blue) {
                         dm.retry(task.id)
                     }
                 }
                 if task.status == .completed {
-                    smallAction("分享", systemImage: "square.and.arrow.up", role: .secondary) {
+                    smallAction("分享", systemImage: "square.and.arrow.up", tint: .secondary) {
                         if let url = dm.fileURL(for: task) {
                             shareItem = ShareItem(url: url)
                         }
                     }
                 }
-                smallAction("删除", systemImage: "trash", role: .destructive) {
+                smallAction("删除", systemImage: "trash", tint: .red) {
                     taskToDelete = task
                 }
             }
@@ -154,14 +154,14 @@ public struct DownloadsView: View {
 
     private func smallAction(_ title: String,
                              systemImage: String,
-                             role: ButtonRole,
+                             tint: Color,
                              action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .font(.caption)
         }
         .buttonStyle(.bordered)
-        .tint(role == .destructive ? .red : (role == .primary ? .blue : .secondary))
+        .tint(tint)
     }
 
     private func statusText(_ t: DownloadTask) -> String {

@@ -364,7 +364,7 @@ final class BaiduClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
         req.setValue(uaWeb, forHTTPHeaderField: "User-Agent")
         req.setValue("https://pan.baidu.com/s/" + surl, forHTTPHeaderField: "Referer")
         if let c = cookie { req.setValue(c, forHTTPHeaderField: "Cookie") }
-        req.httpBody = URLEncoder.form(items: ["pwd": pwd ?? "", "vcode_str": "", "vcode": ""]).data(using: .utf8)
+        req.httpBody = URLEncoder.form(["pwd": pwd ?? "", "vcode_str": "", "vcode": ""]).data(using: .utf8)
 
         let resp = try await HTTP.send(req)
         guard let json = JSON.parse(resp.data) else {
