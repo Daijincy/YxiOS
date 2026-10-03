@@ -1,0 +1,9 @@
+### Xcode / build output
+*.xcodeproj/
+DerivedData/
+.build/
+*.ipa
+dist/
+
+### macOS
+.DS_Store
