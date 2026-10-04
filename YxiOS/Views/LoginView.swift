@@ -31,7 +31,6 @@ public struct LoginView: View {
     private let initialPlatform: Platform
     private let isModal: Bool
     @State private var selected: Platform
-    @State private var showWeb = false
     @State private var showManualCookie = false
     @State private var notice: String?
 
@@ -74,7 +73,10 @@ public struct LoginView: View {
                     case .xunlei:
                         xunleiCard
                     default:
-                        webLoginCard
+                        // 内嵌 WebView 登录窗口（不弹出 sheet，直接嵌入当前界面）
+                        EmbeddedWebLogin(platform: selected)
+                        // 手动输入兜底
+                        manualInputRow
                     }
 
                     clearButton
@@ -93,11 +95,6 @@ public struct LoginView: View {
                         Button("完成") { dismiss() }
                     }
                 }
-            }
-            .sheet(isPresented: $showWeb) {
-                WebLoginSheet(platform: selected)
-                    .presentationDetents([.height(520)])
-                    .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showManualCookie) {
                 ManualCookieSheet(platform: selected)
@@ -141,51 +138,18 @@ public struct LoginView: View {
         }
     }
 
-    private var webLoginCard: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(loginGuideTitle)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                Text(loginGuideBody)
+    private var manualInputRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                showManualCookie = true
+            } label: {
+                Label("手动输入 Cookie/Token", systemImage: "keyboard")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                HStack(spacing: 10) {
-                    GlassButton("打开登录页", systemImage: "safari") {
-                        showWeb = true
-                    }
-                    Button {
-                        showManualCookie = true
-                    } label: {
-                        Label("手动输入", systemImage: "keyboard")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
+            Spacer()
         }
-    }
-
-    private var loginGuideTitle: String {
-        switch selected {
-        case .quark: return "夸克网盘登录"
-        case .baidu: return "百度网盘登录"
-        case .pan123: return "123 云盘登录"
-        case .xunlei: return "迅雷云盘"
-        }
-    }
-
-    private var loginGuideBody: String {
-        switch selected {
-        case .quark:
-            return "将打开夸克网盘 PC 网页版。请在页面中完成登录，登录成功后 App 会自动检测并保存 Cookie（需含 __pus 与 __puus）。若未自动检测，可点右上角「完成登录」手动保存，或用「手动输入」粘贴 Cookie。"
-        case .baidu:
-            return "将打开百度网盘网页版。请在页面中完成登录（建议扫码），登录成功后 App 会自动检测并保存 Cookie（需含 BDUSS）。若未自动检测，可点右上角「完成登录」手动保存。"
-        case .pan123:
-            return "将打开 123 云盘网页版。请在页面中完成登录，登录成功后 App 会自动读取 localStorage 中的 authorToken（JWT）并保存。"
-        case .xunlei:
-            return ""
-        }
+        .padding(.horizontal, 4)
     }
 
     private var xunleiCard: some View {
@@ -214,14 +178,14 @@ public struct LoginView: View {
 
 // MARK: - WKWebView login sheet（含自动登录检测）
 
-public struct WebLoginSheet: View {
+public struct EmbeddedWebLogin: View {
     public let platform: Platform
     @EnvironmentObject private var loginSession: LoginSession
-    @Environment(\.dismiss) private var dismiss
     @StateObject private var model = WebLoginModel()
     @State private var message: String?
     @State private var isAutoSaving = false
     @State private var showTutorial = true
+    @State private var loginSuccess = false
     // 自动检测定时器
     @State private var autoDetectCancellable: Cancellable?
 
@@ -255,41 +219,61 @@ public struct WebLoginSheet: View {
     }
 
     public var body: some View {
-        NavigationStack {
+        VStack(spacing: 12) {
+            // 横向小长方形 WebView 窗口（宽屏比例，适配手机）
             CookieWebView(url: targetURL, model: model, customUA: customUA)
-                .navigationTitle(platform.displayName)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("取消") {
-                            autoDetectCancellable?.cancel()
-                            dismiss()
-                        }
+                .frame(maxWidth: .infinity)
+                .frame(height: 340)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                )
+
+            // 底部：登录成功状态 或 操作按钮
+            if loginSuccess {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.title3)
+                        .foregroundStyle(.green)
+                    Text("登录成功，已保存凭证")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
+                .padding(.horizontal, 4)
+            } else {
+                HStack(spacing: 10) {
+                    Text("在上方窗口完成登录，自动检测中…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(isAutoSaving ? "检测中…" : "完成登录") {
+                        completeLogin()
                     }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(isAutoSaving ? "检测中…" : "完成登录") {
-                            completeLogin()
-                        }
-                        .disabled(isAutoSaving)
-                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color(red: 0.45, green: 0.6, blue: 1.0))
+                    .disabled(isAutoSaving)
                 }
-                .onAppear {
-                    startAutoDetect()
-                }
-                .onDisappear {
-                    autoDetectCancellable?.cancel()
-                }
-                .alert(isPresented: Binding<Bool>(get: { message != nil },
-                                                  set: { if !$0 { message = nil } })) {
-                    Alert(title: Text("提示"),
-                          message: Text(message ?? ""),
-                          dismissButton: .default(Text("好")))
-                }
-                .alert("登录教程", isPresented: $showTutorial) {
-                    Button("知道了") { }
-                } message: {
-                    Text(tutorialText)
-                }
+                .padding(.horizontal, 4)
+            }
+        }
+        .onAppear {
+            startAutoDetect()
+        }
+        .onDisappear {
+            autoDetectCancellable?.cancel()
+        }
+        .alert(isPresented: Binding<Bool>(get: { message != nil },
+                                          set: { if !$0 { message = nil } })) {
+            Alert(title: Text("提示"),
+                  message: Text(message ?? ""),
+                  dismissButton: .default(Text("好")))
+        }
+        .alert("登录教程", isPresented: $showTutorial) {
+            Button("知道了") { }
+        } message: {
+            Text(tutorialText)
         }
     }
 
@@ -366,7 +350,7 @@ public struct WebLoginSheet: View {
                              for: platform)
         autoDetectCancellable?.cancel()
         isAutoSaving = false
-        dismiss()
+        loginSuccess = true
     }
 
     // MARK: - 手动完成登录（兜底）
@@ -378,7 +362,7 @@ public struct WebLoginSheet: View {
         case .pan123:
             grabToken()
         case .xunlei:
-            dismiss()
+            loginSuccess = true
         }
     }
 
@@ -396,7 +380,7 @@ public struct WebLoginSheet: View {
                     loginSession.setAuth(PlatformAuth(cookie: cookieString, token: nil, extra: [:]),
                                          for: self.platform)
                     self.autoDetectCancellable?.cancel()
-                    dismiss()
+                    self.loginSuccess = true
                 }
             }
         }
@@ -409,7 +393,7 @@ public struct WebLoginSheet: View {
                     loginSession.setAuth(PlatformAuth(cookie: nil, token: token, extra: [:]),
                                          for: .pan123)
                     self.autoDetectCancellable?.cancel()
-                    dismiss()
+                    self.loginSuccess = true
                 } else {
                     message = "未读取到 authorToken，请确认已在 123 云盘网页中完成登录。"
                 }
@@ -528,10 +512,9 @@ public final class WebLoginModel: ObservableObject {
         config.websiteDataStore = WKWebsiteDataStore.default()
         webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true
-        // 小窗口模式：禁用滚动，页面缩放适应窗口
-        webView.scrollView.isScrollEnabled = false
-        webView.scrollView.bounces = false
-        webView.contentMode = .scaleAspectFit
+        // 小窗口模式：允许滚动查看完整页面，不缩放
+        webView.scrollView.isScrollEnabled = true
+        webView.scrollView.bounces = true
     }
 }
 
@@ -549,13 +532,7 @@ public struct CookieWebView: UIViewRepresentable {
     public func makeUIView(context: Context) -> WKWebView {
         // 必须在 load 之前设置 customUserAgent
         model.webView.customUserAgent = customUA
-        // 小窗口模式：页面加载后缩放适应（0.75 倍，PC 页面在小窗口里完整显示）
-        let zoomScript = WKUserScript(
-            source: "document.body.style.zoom='0.72'; document.documentElement.style.zoom='0.72';",
-            injectionTime: .atDocumentEnd,
-            forMainFrameOnly: true
-        )
-        model.webView.configuration.userContentController.addUserScript(zoomScript)
+        // 小窗口模式：页面不缩放，完整显示，允许滚动
         model.webView.load(URLRequest(url: url))
         return model.webView
     }
