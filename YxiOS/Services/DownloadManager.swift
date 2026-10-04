@@ -193,6 +193,11 @@ public final class DownloadManager: ObservableObject {
                     return total
                 }
             }
+            // 防盗链/链接失效检查：返回 HTML 错误页
+            if let ct = http.value(forHTTPHeaderField: "Content-Type"),
+               ct.lowercased().contains("text/html") {
+                throw YxiOSError.message("下载失败：直链已失效或防盗链拦截（返回 HTML 页），请重新获取下载链接")
+            }
             let len = http.expectedContentLength
             if len > 0 { return len }
         } catch let e as YxiOSError {
@@ -299,6 +304,11 @@ public final class DownloadManager: ObservableObject {
         }
 
         let (bytes, http) = try await HTTP.dataChunks(for: req)
+        // 防盗链/链接失效检查：CDN 返回 HTML 错误页而非文件
+        if let ct = http.value(forHTTPHeaderField: "Content-Type"),
+           ct.lowercased().contains("text/html") {
+            throw YxiOSError.message("下载失败：直链已失效或防盗链拦截（返回 HTML 页），请重新获取下载链接")
+        }
         if http.statusCode == 200 {
             // 服务器忽略了 Range（整文件）
             rt.rangeIgnored += 1
@@ -369,7 +379,14 @@ public final class DownloadManager: ObservableObject {
         do {
             var req = URLRequest(url: rt.url)
             for (k, v) in rt.headers { req.setValue(v, forHTTPHeaderField: k) }
-            let (bytes, _) = try await HTTP.dataChunks(for: req)
+            let (bytes, http) = try await HTTP.dataChunks(for: req)
+            // 防盗链/链接失效检查
+            if let ct = http.value(forHTTPHeaderField: "Content-Type"),
+               ct.lowercased().contains("text/html") {
+                try? handle.close()
+                markFailed(taskID, "下载失败：直链已失效或防盗链拦截（返回 HTML 页），请重新获取下载链接")
+                return
+            }
             for try await chunk in bytes {
                 if Task.isCancelled || rt.cancelled || rt.paused {
                     try? handle.close()
@@ -379,10 +396,20 @@ public final class DownloadManager: ObservableObject {
             }
             try handle.close()
             let size = ((try? fm.attributesOfItem(atPath: singleFile.path))?[.size] as? UInt64) ?? 0
-            if rt.total > 0 && Int64(size) != rt.total {
+            // 完整性校验放宽：CDN 可能返回不准确的 Content-Length（如压缩/转码后大小）。
+            // 仅当下载大小为 0，或与预期差异超过 10% 且超过 1MB 时才判失败。
+            if size == 0 {
                 try? fm.removeItem(at: singleFile)
-                markFailed(taskID, "下载内容不完整")
+                markFailed(taskID, "下载内容为空")
                 return
+            }
+            if rt.total > 0 {
+                let diff = abs(Int64(size) - rt.total)
+                if diff > rt.total / 10 && diff > 1_000_000 {
+                    try? fm.removeItem(at: singleFile)
+                    markFailed(taskID, "下载内容不完整（预期 \(rt.total) 字节，实际 \(size) 字节）")
+                    return
+                }
             }
             try? await finalize(taskID, from: singleFile)
         } catch {

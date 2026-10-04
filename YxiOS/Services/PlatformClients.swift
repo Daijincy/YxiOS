@@ -644,7 +644,7 @@ final class Pan123Client: PlatformClient, DirectURLProvider, @unchecked Sendable
     /// 按 platform-spec §5.2 生成鉴权头。
     private func signedHeaders(path: String, platform: String, appVersion: String) throws -> [String: String] {
         guard let token = token, !token.isEmpty else {
-            throw YxiOSError.message("123云盘需要登录后才能操作（请在 WebView 登录后读取 authorToken）")
+            throw YxiOSError.message("123云盘下载需要登录，请先在「登录」页完成 123 云盘登录（读取 authorToken）")
         }
         let ts = Int(Date().timeIntervalSince1970)
         let t = ts + 57600
@@ -685,7 +685,7 @@ final class Pan123Client: PlatformClient, DirectURLProvider, @unchecked Sendable
         let headers = try signedHeaders(path: path, platform: "android", appVersion: "39")
         var req = URLRequest(url: URL(string: downloadBase + path)!)
         req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json;charset=UTF-8", forHTTPHeaderField: "Content-Type")
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
         let body: [String: Any] = [
             "ShareKey": share.shareID,
@@ -724,9 +724,10 @@ final class Pan123Client: PlatformClient, DirectURLProvider, @unchecked Sendable
             }
         }
 
+        // 下载头：与 Android 版一致——必须用浏览器 UA（WEB_UA），Dart UA 会被 CDN 拒绝或返回 HTML 错误页
         let downloadHeaders: [String: String] = [
             "Referer": "https://yun.123pan.cn/",
-            "User-Agent": dartUA
+            "User-Agent": webUA
         ]
         guard let url = URL(string: current) else {
             throw YxiOSError.message("123云盘：直链无效")
