@@ -391,12 +391,13 @@ final class BaiduClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
             throw YxiOSError.message(serverMessage(json, fallback: "百度：获取文件列表失败（errno=\(errno)）"))
         }
 
-        // 缓存 share_id / uk
-        let sid = json["data"]?["share_id"]?.string ?? ""
-        let uk = json["data"]?["uk"]?.string ?? ""
+        // 缓存 share_id / uk（百度 API 返回在顶层，不是 data 嵌套）
+        let sid = json["share_id"]?.string ?? ""
+        let uk = json["uk"]?.string ?? ""
         cache.mutate { $0[surl] = ShareCache(surl: surl, sekey: sekey, shareID: sid, uk: uk) }
 
-        guard let list = json["data"]?["list"]?.array else { return [] }
+        // list 在顶层（不是 data.list），取错会导致解析出空目录
+        guard let list = json["list"]?.array else { return [] }
         var out: [FileEntry] = []
         for item in list {
             let isDir = item["isdir"]?.string == "1"
