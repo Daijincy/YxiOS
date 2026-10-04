@@ -169,6 +169,8 @@ public final class DownloadManager: ObservableObject {
         var activeCount: Int = 0
         /// 下一个待启动的分片索引
         var nextChunkIndex: Int = 0
+        /// 上次进度 UI 更新时间戳（节流用）
+        var lastProgressUpdate: TimeInterval = 0
 
         init(url: URL, headers: [String: String], dir: URL) {
             self.url = url
@@ -306,6 +308,7 @@ public final class DownloadManager: ObservableObject {
             do {
                 try await downloadOneChunk(taskID: taskID, index: index)
                 rt.done[index] = true
+                refreshProgress(taskID, force: true)  // 分片完成时强制刷新，避免最后进度卡在节流间隔里
                 chunkSettled(taskID, error: nil)
                 return
             } catch is CancellationError {
@@ -575,8 +578,16 @@ public final class DownloadManager: ObservableObject {
         Storage.saveTasks(tasks)
     }
 
-    private func refreshProgress(_ taskID: UUID) {
+    /// 进度 UI 更新节流：每 200ms 最多刷新一次，避免高速下载时每秒上百次 @Published 触发 SwiftUI 掉帧
+    private let progressThrottleInterval: TimeInterval = 0.2
+
+    private func refreshProgress(_ taskID: UUID, force: Bool = false) {
         guard let rt = runtimes[taskID] else { return }
+        if !force {
+            let now = Date().timeIntervalSince1970
+            guard now - rt.lastProgressUpdate >= progressThrottleInterval else { return }
+            rt.lastProgressUpdate = now
+        }
         updateTask(taskID) {
             $0.downloadedBytes = rt.downloadedBytes
             if rt.total > 0 {
