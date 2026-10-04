@@ -12,6 +12,8 @@
 //
 //  Share-link detection. 统一使用同一套规则做「平台识别 + shareID 提取」，
 //  避免平台判断与 ID 提取用两套不一致正则导致识别失败。
+//  链接刮削：从任意文本（含文案/换行/中文/emoji/无空格/多链接）中
+//  可靠提取第一个网盘 URL。
 //
 
 import Foundation
@@ -33,6 +35,7 @@ public enum ShareLinkParser {
     ]
 
     /// 输入任意文本，识别出第一个网盘分享链接并解析；识别失败返回 nil。
+    /// 支持从整段分享文案（含换行/中文/emoji/无空格）中刮削出链接。
     public static func parse(_ text: String) -> ShareInfo? {
         guard let rawURL = firstURL(in: text) else { return nil }
         guard let (platform, shareID) = detect(in: rawURL), !shareID.isEmpty else { return nil }
@@ -65,19 +68,35 @@ public enum ShareLinkParser {
         return nil
     }
 
-    // MARK: - Helpers
+    // MARK: - 链接刮削
 
-    /// 抓第一个 URL，并 trim 结尾标点。
+    /// 从任意文本中提取第一个 http(s) URL。
+    /// 处理场景：
+    /// - URL 前后有中文文案/emoji/换行
+    /// - URL 后紧跟中文（无空格），如 https://pan.quark.cn/s/xxx提取码：1234
+    /// - URL 被 markdown 包裹，如 [链接](https://...)
+    /// - URL 末尾有标点符号
+    /// - 文本中有多个 URL，取第一个
     private static func firstURL(in text: String) -> String? {
-        guard var url = match("https?://[^\\s]+", in: text) else { return nil }
-        // 去掉结尾标点：。，,；;)] } " '
-        while let last = url.last, "。，,；;)]}\"'".contains(last) {
+        // 注意：必须有捕获组，否则 match() 会因 numberOfRanges < 2 返回 nil
+        guard var url = match("(https?://[^\\s]+)", in: text) else { return nil }
+        // 去掉结尾标点：。，,；;)] } " ' 以及全角括号
+        while let last = url.last, "。，,；;)]}\"'）】》".contains(last) {
             url.removeLast()
         }
-        return url
+        // 如果 URL 末尾紧跟中文字符（无空格），截断到最后一个合法 URL 字符
+        // 合法 URL 字符：字母数字 + -._~:/?#[]@!$&'()*+,;=%
+        let validChars = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~:/?#[]@!$&'()*+,;=%")
+        if let lastValidIndex = url.lastIndex(where: { $0.unicodeScalars.allSatisfy({ validChars.contains($0) }) }) {
+            url = String(url[...lastValidIndex])
+        }
+        return url.isEmpty ? nil : url
     }
 
+    // MARK: - Helpers
+
     /// 用 NSRegularExpression 取第一个捕获组（IGNORE CASE）。
+    /// 注意：pattern 必须包含至少一个捕获组 (...)，否则返回 nil。
     private static func match(_ pattern: String, in text: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
             return nil
