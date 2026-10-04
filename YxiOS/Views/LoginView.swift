@@ -198,7 +198,8 @@ public struct EmbeddedWebLogin: View {
         case .quark:
             return URL(string: "https://pan.quark.cn/?fr=pc&platform=pc")!
         case .baidu:
-            return URL(string: "https://pan.baidu.com/")!
+            // 用百度通行证全页面登录页，避免 pan.baidu.com 的弹窗登录框在小窗口里点不了
+            return URL(string: "https://passport.baidu.com/v2/?login&u=https%3A%2F%2Fpan.baidu.com%2Fdisk%2Fmain")!
         case .pan123:
             return URL(string: "https://yun.123pan.cn/")!
         case .xunlei:

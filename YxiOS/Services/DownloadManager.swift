@@ -98,6 +98,7 @@ public final class DownloadManager: ObservableObject {
         rt.paused = false
         rt.cancelled = false
         rt.settled = 0
+        rt.nextChunkIndex = 0  // 重置，从头扫描未完成分片
         rt.downloadedBytes = onDiskBytes(rt)
         updateTask(id) {
             $0.status = .downloading
@@ -164,6 +165,10 @@ public final class DownloadManager: ObservableObject {
         var rangeIgnored = 0
         var taskRetries = 0
         var lastError: String?
+        /// 当前活跃分片数（用于并发控制）
+        var activeCount: Int = 0
+        /// 下一个待启动的分片索引
+        var nextChunkIndex: Int = 0
 
         init(url: URL, headers: [String: String], dir: URL) {
             self.url = url
@@ -212,6 +217,11 @@ public final class DownloadManager: ObservableObject {
         return -1
     }
 
+    /// 最大分片数（512 线程）
+    private let maxChunks = 512
+    /// 最大并发数（iOS 网络限制，实际同时跑的请求数）
+    private let maxConcurrent = 32
+
     private func setupChunks(_ rt: Runtime) {
         if rt.total <= 0 {
             rt.partCount = 1
@@ -219,9 +229,19 @@ public final class DownloadManager: ObservableObject {
             rt.done = [false]
             return
         }
-        let chunkSize: Int64 = 8 * 1024 * 1024
+        // 动态分片大小：文件越大，分片越大，确保分片数在合理范围（≤512）
+        let chunkSize: Int64
+        if rt.total < 100 * 1024 * 1024 {
+            chunkSize = 512 * 1024  // <100MB: 512KB/片
+        } else if rt.total < 1024 * 1024 * 1024 {
+            chunkSize = 2 * 1024 * 1024  // 100MB-1GB: 2MB/片
+        } else if rt.total < 10 * 1024 * 1024 * 1024 {
+            chunkSize = 8 * 1024 * 1024  // 1GB-10GB: 8MB/片
+        } else {
+            chunkSize = 16 * 1024 * 1024  // >10GB: 16MB/片
+        }
         var n = Int((rt.total + chunkSize - 1) / chunkSize)
-        n = min(n, 4)
+        n = min(n, maxChunks)
         n = max(n, 1)
         rt.partCount = n
         rt.ranges = []
@@ -234,6 +254,8 @@ public final class DownloadManager: ObservableObject {
             rt.done.append(false)
         }
         rt.downloadedBytes = onDiskBytes(rt)
+        rt.nextChunkIndex = 0
+        rt.activeCount = 0
     }
 
     private func onDiskBytes(_ rt: Runtime) -> Int64 {
@@ -249,16 +271,40 @@ public final class DownloadManager: ObservableObject {
 
     private func launchChunks(_ taskID: UUID) {
         guard let rt = runtimes[taskID] else { return }
-        rt.workers.removeAll()
-        for i in 0..<rt.partCount {
-            if rt.done[i] { continue }
-            let t = Task { await self.runChunk(taskID: taskID, index: i) }
+        // 启动最多 maxConcurrent 个未完成的分片（并发控制）
+        var started = 0
+        while started < maxConcurrent && rt.nextChunkIndex < rt.partCount {
+            let idx = rt.nextChunkIndex
+            rt.nextChunkIndex += 1
+            if rt.done[idx] { continue }
+            let t = Task { await self.runChunk(taskID: taskID, index: idx) }
             rt.workers.append(t)
+            started += 1
+        }
+    }
+
+    /// 启动下一个未完成的分片（在当前分片完成后调用）
+    private func launchNextChunk(_ taskID: UUID) {
+        guard let rt = runtimes[taskID] else { return }
+        guard !rt.cancelled, !rt.paused else { return }
+        while rt.nextChunkIndex < rt.partCount {
+            let idx = rt.nextChunkIndex
+            rt.nextChunkIndex += 1
+            if rt.done[idx] { continue }
+            let t = Task { await self.runChunk(taskID: taskID, index: idx) }
+            rt.workers.append(t)
+            return
         }
     }
 
     private func runChunk(taskID: UUID, index: Int) async {
         guard let rt = runtimes[taskID] else { return }
+        rt.activeCount += 1
+        defer {
+            rt.activeCount -= 1
+            // 当前分片完成后，启动下一个未完成的分片
+            launchNextChunk(taskID)
+        }
         for attempt in 0..<3 {
             if rt.cancelled || rt.paused { return }
             do {
@@ -363,6 +409,7 @@ public final class DownloadManager: ObservableObject {
                 try? await Task.sleep(nanoseconds: UInt64(waitMs) * 1_000_000)
                 guard let r = self.runtimes[taskID], !r.cancelled, !r.paused else { return }
                 r.settled = 0
+                r.nextChunkIndex = 0  // 重置，从头扫描未完成分片
                 self.launchChunks(taskID)
             }
         } else {
