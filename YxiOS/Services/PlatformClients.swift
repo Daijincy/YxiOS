@@ -369,12 +369,10 @@ final class BaiduClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
     }
 
     private func listFiles(surl: String, dir: String, root: Int, sekey: String?) async throws -> [FileEntry] {
-        var items: [String: String?] = [
-            "method": "list", "shorturl": surl, "page": "1", "num": "100",
-            "root": "\(root)", "dir": dir
-        ]
-        if let sekey = sekey, !sekey.isEmpty { items["sekey"] = sekey }
-        let urlString = "https://pan.baidu.com/rest/2.0/xpan/share?" + URLEncoder.query(items: items)
+        // sekey（randsk）本身已 URL 编码，直接拼接不可再次编码（与 Android 版一致）
+        let sekeyPart = (sekey?.isEmpty == false) ? "&sekey=\(sekey!)" : ""
+        let urlString = "https://pan.baidu.com/rest/2.0/xpan/share?method=list" +
+            "&shorturl=\(surl)&page=1&num=100&root=\(root)&dir=\(dir)" + sekeyPart
         var req = URLRequest(url: URL(string: urlString)!)
         req.setValue(uaWeb, forHTTPHeaderField: "User-Agent")
         req.setValue("https://pan.baidu.com/s/" + surl, forHTTPHeaderField: "Referer")
@@ -446,11 +444,11 @@ final class BaiduClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
 
     private func transfer(fsID: String, sc: ShareCache, bdstoken: String) async throws -> String {
         let sekey = sc.sekey ?? ""
-        let q = URLEncoder.query(items: [
-            "shareid": sc.shareID, "from": sc.uk, "channel": "chunlei",
-            "sekey": sekey, "ondup": "newcopy", "web": "1",
-            "app_id": appID, "bdstoken": bdstoken, "clienttype": "0"
-        ])
+        // ★ sekey（= verify 返回的 randsk）本身已是 URL 编码，必须直接拼接不可再次编码，
+        //   否则 % → %25 双重编码导致百度报「提取码错误」（与 Android 版一致手动拼接）
+        let q = "shareid=\(sc.shareID)&from=\(sc.uk)&channel=chunlei" +
+            "&sekey=\(sekey)&ondup=newcopy&web=1&app_id=\(appID)" +
+            "&bdstoken=\(bdstoken)&clienttype=0"
         let urlString = "https://pan.baidu.com/share/transfer?" + q
         var req = URLRequest(url: URL(string: urlString)!)
         req.httpMethod = "POST"
