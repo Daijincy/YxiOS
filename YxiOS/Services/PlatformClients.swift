@@ -150,13 +150,8 @@ final class QuarkClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
         let referer = "https://pan.quark.cn/"
 
         if isLoggedIn {
-            // 先尝试登录态直链
-            if let url = try await loggedInDownloadURL(fid: file.id) {
-                var headers: [String: String] = ["Referer": referer, "User-Agent": ua]
-                if let c = cookie { headers["Cookie"] = c }
-                return ResolvedDirectURL(url: URL(string: url)!, headers: headers)
-            }
-            // 大文件：转存→轮询→新fid→取链→清理
+            // 登录态：始终走转存流程（与 Android 版一致）
+            // 分享文件 fid 不能直接调 download 接口，必须转存到个人盘后用新 fid 取链
             let url = try await largeFileDownloadURL(file: file, share: share)
             var headers: [String: String] = ["Referer": referer, "User-Agent": ua]
             if let c = cookie { headers["Cookie"] = c }
@@ -275,14 +270,8 @@ final class QuarkClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
         guard let url = try await loggedInDownloadURL(fid: nf) else {
             throw YxiOSError.message("夸克：获取大文件直链失败")
         }
-        // 清理转存文件（best effort）
-        var dreq = URLRequest(url: URL(string: base + "/1/clouddrive/file/delete?pr=ucpro&fr=pc&uc_param_str=")!)
-        dreq.httpMethod = "POST"
-        dreq.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        dreq.setValue(ua, forHTTPHeaderField: "User-Agent")
-        if let c = cookie { dreq.setValue(c, forHTTPHeaderField: "Cookie") }
-        dreq.httpBody = try? JSONSerialization.data(withJSONObject: ["action_type": 2, "filelist": [nf]], options: [])
-        _ = try? await HTTP.send(dreq)
+        // 注意：不立即删除转存文件——夸克直链可能绑定文件，删除后直链会失效
+        // 文件保留在用户网盘根目录，用户可自行清理
         return url
     }
 }

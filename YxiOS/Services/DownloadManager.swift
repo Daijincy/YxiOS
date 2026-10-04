@@ -22,6 +22,8 @@ public final class DownloadManager: ObservableObject {
     public static let shared = DownloadManager()
 
     @Published public private(set) var tasks: [DownloadTask] = []
+    /// 下载成功启动时的文件名提示（用于 UI 弹出"已开始下载"并跳转）
+    @Published public var downloadStartedFileName: String?
 
     private var runtimes: [UUID: Runtime] = [:]
     private let fm = FileManager.default
@@ -70,6 +72,8 @@ public final class DownloadManager: ObservableObject {
             setupChunks(rt)
             markDownloading(task.id)
             launchChunks(task.id)
+            // 下载成功启动，通知 UI 弹出提示并跳转
+            downloadStartedFileName = file.name
         } catch {
             let msg = (error as? YxiOSError)?.errorDescription ?? error.localizedDescription
             updateTask(task.id) {
