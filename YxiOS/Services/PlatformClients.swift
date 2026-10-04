@@ -315,7 +315,9 @@ final class BaiduClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
             throw YxiOSError.message("百度网盘需要登录后才能解析分享")
         }
         let surl = info.shareID
-        let sekey = try await verify(surl: surl, pwd: info.password)
+        // 公共分享（无提取码）跳过 verify，sekey 置空（与云析一致）
+        let pwd = info.password?.trimmingCharacters(in: .whitespaces) ?? ""
+        let sekey = pwd.isEmpty ? nil : try await verify(surl: surl, pwd: pwd)
         let list = try await listFiles(surl: surl, dir: "/", root: 1, sekey: sekey)
         return list
     }
@@ -341,8 +343,18 @@ final class BaiduClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
     private func effectiveCookie(sekey: String?) -> String? {
         guard let base = cookie else { return nil }
         guard let sekey = sekey, !sekey.isEmpty else { return base }
-        if base.contains("BDCLND=") { return base }
-        return base + "; BDCLND=" + sekey
+        // ★ 必须先移除旧的 BDCLND（WebView 登录时可能抓到其他分享的旧 BDCLND），
+        //   否则 base.contains("BDCLND=") 直接返回旧值，当前分享的 sekey 被忽略 → 提取码错误
+        var cleaned = base
+        if let range = cleaned.range(of: "BDCLND=") {
+            if let semicolon = cleaned[range.upperBound...].firstIndex(of: ";") {
+                cleaned.removeSubrange(range.lowerBound..<semicolon)
+            } else {
+                cleaned.removeSubrange(range.lowerBound...)
+            }
+            cleaned = cleaned.trimmingCharacters(in: CharacterSet(charactersIn: "; "))
+        }
+        return cleaned + "; BDCLND=" + sekey
     }
 
     private func verify(surl: String, pwd: String?) async throws -> String? {
@@ -452,7 +464,7 @@ final class BaiduClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
         let urlString = "https://pan.baidu.com/share/transfer?" + q
         var req = URLRequest(url: URL(string: urlString)!)
         req.httpMethod = "POST"
-        req.setValue("application/x-www-form-urlencoded; charset=UTF-8", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         req.setValue(uaWeb, forHTTPHeaderField: "User-Agent")
         req.setValue("https://pan.baidu.com", forHTTPHeaderField: "Origin")
         req.setValue("https://pan.baidu.com/s/", forHTTPHeaderField: "Referer")

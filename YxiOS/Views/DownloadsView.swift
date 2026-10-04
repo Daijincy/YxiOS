@@ -111,6 +111,21 @@ public struct DownloadsView: View {
                                              total: task.totalBytes))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                // 下载速度 + 预计剩余时间
+                if task.status == .downloading {
+                    let speed = dm.speed(for: task.id)
+                    if speed > 0 {
+                        Text("· \(DownloadManager.formatSpeed(speed))")
+                            .font(.caption)
+                            .foregroundStyle(Color(red: 0.45, green: 0.7, blue: 1.0))
+                        let remaining = task.totalBytes > task.downloadedBytes
+                            ? Double(task.totalBytes - task.downloadedBytes) / speed
+                            : 0
+                        Text("· 剩余 \(DownloadManager.formatRemaining(remaining))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 if let msg = task.errorMessage, task.status == .failed {
                     Text("· \(msg)")
                         .font(.caption)

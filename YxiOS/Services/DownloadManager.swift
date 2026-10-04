@@ -27,6 +27,38 @@ public final class DownloadManager: ObservableObject {
 
     private var runtimes: [UUID: Runtime] = [:]
     private let fm = FileManager.default
+    /// 实时下载速度（字节/秒），非持久化，UI 显示用
+    private var speeds: [UUID: Double] = [:]
+
+    /// 获取指定任务的实时下载速度（字节/秒）
+    public func speed(for taskID: UUID) -> Double { speeds[taskID] ?? 0 }
+
+    /// 格式化速度为人类可读字符串（如 "1.2 MB/s"）
+    public static func formatSpeed(_ bytesPerSecond: Double) -> String {
+        if bytesPerSecond <= 0 { return "0 B/s" }
+        let units = ["B/s", "KB/s", "MB/s", "GB/s"]
+        var value = bytesPerSecond
+        var unitIndex = 0
+        while value >= 1024 && unitIndex < units.count - 1 {
+            value /= 1024
+            unitIndex += 1
+        }
+        return String(format: "%.1f %@", value, units[unitIndex])
+    }
+
+    /// 格式化剩余时间（如 "1分23秒"、"2小时5分"）
+    public static func formatRemaining(_ seconds: Double) -> String {
+        if seconds <= 0 || seconds.isInfinite { return "计算中…" }
+        if seconds < 60 { return String(format: "%.0f秒", seconds) }
+        if seconds < 3600 {
+            let m = Int(seconds) / 60
+            let s = Int(seconds) % 60
+            return "\(m)分\(s)秒"
+        }
+        let h = Int(seconds) / 3600
+        let m = (Int(seconds) % 3600) / 60
+        return "\(h)小时\(m)分"
+    }
 
     private init() {
         tasks = Storage.loadTasks()
@@ -171,6 +203,9 @@ public final class DownloadManager: ObservableObject {
         var nextChunkIndex: Int = 0
         /// 上次进度 UI 更新时间戳（节流用）
         var lastProgressUpdate: TimeInterval = 0
+        /// 速度统计：上次计算速度时的时间戳和已下载字节数
+        var lastSpeedTime: TimeInterval = 0
+        var lastSpeedBytes: Int64 = 0
 
         init(url: URL, headers: [String: String], dir: URL) {
             self.url = url
@@ -583,11 +618,28 @@ public final class DownloadManager: ObservableObject {
 
     private func refreshProgress(_ taskID: UUID, force: Bool = false) {
         guard let rt = runtimes[taskID] else { return }
+        let now = Date().timeIntervalSince1970
         if !force {
-            let now = Date().timeIntervalSince1970
             guard now - rt.lastProgressUpdate >= progressThrottleInterval else { return }
-            rt.lastProgressUpdate = now
         }
+        rt.lastProgressUpdate = now
+
+        // 计算实时下载速度（基于上次检查到现在的字节差/时间差）
+        if rt.lastSpeedTime > 0 {
+            let dt = now - rt.lastSpeedTime
+            if dt > 0.1 {
+                let dB = Double(rt.downloadedBytes - rt.lastSpeedBytes)
+                if dB >= 0 {
+                    let instantSpeed = dB / dt
+                    // 滑动平均（70% 历史 + 30% 瞬时），避免抖动
+                    let prev = speeds[taskID] ?? instantSpeed
+                    speeds[taskID] = prev * 0.7 + instantSpeed * 0.3
+                }
+            }
+        }
+        rt.lastSpeedTime = now
+        rt.lastSpeedBytes = rt.downloadedBytes
+
         updateTask(taskID) {
             $0.downloadedBytes = rt.downloadedBytes
             if rt.total > 0 {
