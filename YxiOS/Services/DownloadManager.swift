@@ -217,10 +217,8 @@ public final class DownloadManager: ObservableObject {
         return -1
     }
 
-    /// 最大分片数（512 线程）
-    private let maxChunks = 512
-    /// 最大并发数（iOS 网络限制，实际同时跑的请求数）
-    private let maxConcurrent = 32
+    /// 用户设置的下载线程数（同时作为最大分片数和最大并发数）
+    private var threadCount: Int { Storage.downloadThreads }
 
     private func setupChunks(_ rt: Runtime) {
         if rt.total <= 0 {
@@ -229,19 +227,16 @@ public final class DownloadManager: ObservableObject {
             rt.done = [false]
             return
         }
-        // 动态分片大小：文件越大，分片越大，确保分片数在合理范围（≤512）
-        let chunkSize: Int64
-        if rt.total < 100 * 1024 * 1024 {
-            chunkSize = 512 * 1024  // <100MB: 512KB/片
-        } else if rt.total < 1024 * 1024 * 1024 {
-            chunkSize = 2 * 1024 * 1024  // 100MB-1GB: 2MB/片
-        } else if rt.total < 10 * 1024 * 1024 * 1024 {
-            chunkSize = 8 * 1024 * 1024  // 1GB-10GB: 8MB/片
-        } else {
-            chunkSize = 16 * 1024 * 1024  // >10GB: 16MB/片
+        // 目标分片数 = 用户设置的线程数（每个分片一个并发连接，跑满带宽）
+        let targetChunks = threadCount
+        // 动态分片大小：确保分片数接近目标值，最小 256KB/片（避免过小文件分片过多）
+        let minChunkSize: Int64 = 256 * 1024
+        var n = targetChunks
+        let perByTarget = (rt.total + Int64(n) - 1) / Int64(n)
+        if perByTarget < minChunkSize {
+            // 文件太小，按最小分片大小计算分片数
+            n = Int((rt.total + minChunkSize - 1) / minChunkSize)
         }
-        var n = Int((rt.total + chunkSize - 1) / chunkSize)
-        n = min(n, maxChunks)
         n = max(n, 1)
         rt.partCount = n
         rt.ranges = []
@@ -271,7 +266,8 @@ public final class DownloadManager: ObservableObject {
 
     private func launchChunks(_ taskID: UUID) {
         guard let rt = runtimes[taskID] else { return }
-        // 启动最多 maxConcurrent 个未完成的分片（并发控制）
+        // 启动最多 threadCount 个未完成的分片（并发数 = 用户设置的线程数）
+        let maxConcurrent = threadCount
         var started = 0
         while started < maxConcurrent && rt.nextChunkIndex < rt.partCount {
             let idx = rt.nextChunkIndex

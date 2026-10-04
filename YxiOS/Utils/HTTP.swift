@@ -56,6 +56,8 @@ enum HTTP {
         // 不自动管理 Cookie，各平台手动塞 Cookie 头（见 platform-spec §8.2）
         cfg.httpCookieStorage = nil
         cfg.httpShouldSetCookies = false
+        // ★ 关键：解除 iOS 默认每主机 4 连接限制，否则多线程下载被硬钳到 4 并发
+        cfg.httpMaximumConnectionsPerHost = 512
         return URLSession(configuration: cfg)
     }()
 

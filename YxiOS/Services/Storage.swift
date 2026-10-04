@@ -51,4 +51,17 @@ public enum Storage {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
+
+    // MARK: - 用户设置（UserDefaults）
+
+    private static let defaults = UserDefaults.standard
+
+    /// 下载线程数（分片数=并发数），默认 32
+    public static var downloadThreads: Int {
+        get {
+            let v = defaults.integer(forKey: "downloadThreads")
+            return v > 0 ? v : 32
+        }
+        set { defaults.set(max(1, min(512, newValue)), forKey: "downloadThreads") }
+    }
 }

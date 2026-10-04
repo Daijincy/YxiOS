@@ -17,12 +17,19 @@
 import SwiftUI
 
 public struct SettingsView: View {
+    @State private var threadCount: Int = Storage.downloadThreads
+    @State private var customThreads: String = ""
+    @State private var showCustomInput = false
+
+    private let presetThreads = [8, 16, 32, 64, 128, 256]
+
     public init() {}
 
     public var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    downloadCard
                     appCard
                     licenseCard
                     platformsCard
@@ -33,6 +40,70 @@ public struct SettingsView: View {
             .background(LiquidGlassBackground())
             .scrollContentBackground(.hidden)
             .navigationTitle("设置")
+        }
+    }
+
+    // MARK: - 下载设置
+
+    private var downloadCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("下载设置", systemImage: "bolt.horizontal.fill")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("下载线程数")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text("线程越多速度越快，但过高可能被网盘 CDN 限流。建议 32-64。")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
+                // 预设线程数按钮组
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 70), spacing: 8)], spacing: 8) {
+                    ForEach(presetThreads, id: \.self) { count in
+                        ThreadButton(title: "\(count)", isSelected: threadCount == count && !showCustomInput) {
+                            threadCount = count
+                            showCustomInput = false
+                            Storage.downloadThreads = count
+                        }
+                    }
+                    // 自定义按钮
+                    ThreadButton(title: "自定义", isSelected: showCustomInput) {
+                        showCustomInput = true
+                        customThreads = "\(threadCount)"
+                    }
+                }
+
+                // 自定义输入框
+                if showCustomInput {
+                    HStack(spacing: 8) {
+                        TextField("输入线程数 (1-512)", text: $customThreads)
+                            .keyboardType(.numberPad)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 200)
+                        Button("确定") {
+                            if let v = Int(customThreads), v >= 1, v <= 512 {
+                                threadCount = v
+                                Storage.downloadThreads = v
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                }
+
+                // 当前生效值
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("当前：\(threadCount) 线程（\(threadCount) 分片并发下载）")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -115,5 +186,28 @@ public struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+// MARK: - 线程数按钮
+
+private struct ThreadButton: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isSelected ? Color(red: 0.45, green: 0.55, blue: 0.95).opacity(0.8) : Color.white.opacity(0.08))
+                )
+                .foregroundStyle(isSelected ? .white : .secondary)
+        }
+        .buttonStyle(.plain)
     }
 }
