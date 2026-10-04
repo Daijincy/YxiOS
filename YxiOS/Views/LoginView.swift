@@ -79,7 +79,10 @@ public struct LoginView: View {
                         manualInputRow
                     }
 
-                    clearButton
+                    // 迅雷是游客模式，不需要登录态，不显示清除按钮
+                    if selected != .xunlei {
+                        clearButton
+                    }
                 }
                 .padding()
                 .frame(maxWidth: 650)
@@ -198,8 +201,8 @@ public struct EmbeddedWebLogin: View {
         case .quark:
             return URL(string: "https://pan.quark.cn/?fr=pc&platform=pc")!
         case .baidu:
-            // 用百度通行证全页面登录页，避免 pan.baidu.com 的弹窗登录框在小窗口里点不了
-            return URL(string: "https://passport.baidu.com/v2/?login&u=https%3A%2F%2Fpan.baidu.com%2Fdisk%2Fmain")!
+            // 百度网盘主页，用移动端 UA 会自动跳转移动版登录页（全页面，无弹窗）
+            return URL(string: "https://pan.baidu.com/")!
         case .pan123:
             return URL(string: "https://yun.123pan.cn/")!
         case .xunlei:
@@ -207,12 +210,15 @@ public struct EmbeddedWebLogin: View {
         }
     }
 
-    /// 该平台 WebView 需使用的自定义 User-Agent（PC 环境，避免被识别为移动端）
+    /// 该平台 WebView 需使用的自定义 User-Agent
     private var customUA: String {
         switch platform {
         case .quark:
             // 夸克 PC 客户端 UA（与 YunX QuarkConstants.USER_AGENT 一致）
             return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 QuarkPC/6.0.8.649"
+        case .baidu:
+            // 百度用移动端 UA，返回移动版登录页（全页面，避免 PC 版弹窗在小窗口里点不了）
+            return "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
         default:
             // 普通 PC Chrome UA
             return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
@@ -264,6 +270,14 @@ public struct EmbeddedWebLogin: View {
         }
         .onDisappear {
             autoDetectCancellable?.cancel()
+        }
+        // 切换平台时重新加载 WebView（model 是 StateObject 不会重建，需手动 reload）
+        .onChange(of: platform) { newPlatform in
+            loginSuccess = false
+            model.webView.customUserAgent = customUA
+            model.webView.load(URLRequest(url: targetURL))
+            autoDetectCancellable?.cancel()
+            startAutoDetect()
         }
         .alert(isPresented: Binding<Bool>(get: { message != nil },
                                           set: { if !$0 { message = nil } })) {

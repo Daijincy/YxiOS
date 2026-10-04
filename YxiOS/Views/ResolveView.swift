@@ -105,7 +105,7 @@ public struct ResolveView: View {
                         )
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    Button(action: { linkText = ""; passwordText = "" }) {
+                    Button(action: { linkText = ""; passwordText = ""; shareInfo = nil; parseError = nil }) {
                         HStack(spacing: 4) {
                             Image(systemName: "xmark.circle")
                             Text("清除")
