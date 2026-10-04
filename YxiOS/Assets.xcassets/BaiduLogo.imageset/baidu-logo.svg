@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="baiduBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2932E1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1A1FB8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- 背景圆 -->
+  <circle cx="60" cy="60" r="56" fill="url(#baiduBg)"/>
+  <!-- 熊掌：大掌垫 -->
+  <ellipse cx="60" cy="74" rx="22" ry="17" fill="#FFFFFF"/>
+  <!-- 熊掌：4个脚趾 -->
+  <ellipse cx="38" cy="48" rx="8" ry="11" fill="#FFFFFF"/>
+  <ellipse cx="53" cy="40" rx="8" ry="11" fill="#FFFFFF"/>
+  <ellipse cx="68" cy="40" rx="8" ry="11" fill="#FFFFFF"/>
+  <ellipse cx="83" cy="48" rx="8" ry="11" fill="#FFFFFF"/>
+</svg>

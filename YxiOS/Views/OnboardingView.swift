@@ -2,7 +2,7 @@
 //  OnboardingView.swift
 //  YxiOS
 //
-//  首次启动引导：逐个网盘询问配置 → 欢迎页 → 进入主界面
+//  首次启动引导：介绍页 → 逐个网盘询问配置 → 欢迎页 → 进入主界面
 //
 
 import SwiftUI
@@ -13,9 +13,10 @@ struct OnboardingView: View {
     @State private var currentPage = 0
     @State private var selectedPlatforms: [Platform] = []
     // 每页元素的动画状态
-    @State private var animStates: [Bool] = Array(repeating: false, count: 6)
+    @State private var animStates: [Bool] = Array(repeating: false, count: 7)
 
     private let pages: [OnboardingPage] = [
+        .intro,
         .platform(.quark),
         .platform(.baidu),
         .platform(.pan123),
@@ -80,10 +81,115 @@ struct OnboardingView: View {
     @ViewBuilder
     private func pageContent(for page: OnboardingPage, index: Int) -> some View {
         switch page {
+        case .intro:
+            introPage(index: index)
         case .platform(let p):
             platformAskPage(p, index: index)
         case .welcome:
             welcomePage(index: index)
+        }
+    }
+
+    // MARK: - 介绍页（YxiOS 是干啥的）
+
+    private func introPage(index: Int) -> some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            // Logo
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(red: 0.45, green: 0.6, blue: 1.0),
+                                     Color(red: 0.6, green: 0.45, blue: 1.0)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 110, height: 110)
+                    .shadow(color: Color(red: 0.45, green: 0.6, blue: 1.0).opacity(0.5), radius: 30)
+
+                Image(systemName: "cloud.fill")
+                    .font(.system(size: 50, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .opacity(animStates[safe: index] ?? false ? 1 : 0)
+            .scaleEffect((animStates[safe: index] ?? false) ? 1 : 0.5)
+
+            // 标题
+            Text("云析 YxiOS")
+                .font(.system(size: 32, weight: .bold))
+                .foregroundStyle(.white)
+                .opacity(animStates[safe: index] ?? false ? 1 : 0)
+                .offset(y: (animStates[safe: index] ?? false) ? 0 : 20)
+
+            // 副标题
+            Text("多网盘分享链接解析与下载工具")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .opacity(animStates[safe: index] ?? false ? 1 : 0)
+                .offset(y: (animStates[safe: index] ?? false) ? 0 : 20)
+
+            // 功能列表
+            VStack(alignment: .leading, spacing: 14) {
+                featureRow(icon: "link.circle.fill", title: "一键解析", desc: "粘贴分享链接，自动识别平台并提取文件")
+                featureRow(icon: "arrow.down.circle.fill", title: "高速下载", desc: "支持多线程分片下载与断点续传")
+                featureRow(icon: "square.stack.3d.up.fill", title: "四大平台", desc: "夸克 / 百度 / 123 / 迅雷 全覆盖")
+                featureRow(icon: "sparkles", title: "液态玻璃", desc: "iOS 27 原生设计，流畅动效体验")
+            }
+            .padding(.horizontal, 30)
+            .opacity(animStates[safe: index] ?? false ? 1 : 0)
+            .offset(y: (animStates[safe: index] ?? false) ? 0 : 30)
+
+            Spacer()
+
+            // 开始按钮
+            Button(action: { nextPage() }) {
+                HStack(spacing: 8) {
+                    Text("开始配置")
+                        .font(.headline)
+                    Image(systemName: "arrow.right")
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(red: 0.45, green: 0.6, blue: 1.0),
+                                         Color(red: 0.6, green: 0.45, blue: 1.0)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
+                .padding(.horizontal, 40)
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .opacity(animStates[safe: index] ?? false ? 1 : 0)
+            .offset(y: (animStates[safe: index] ?? false) ? 0 : 30)
+
+            Spacer().frame(height: 40)
+        }
+    }
+
+    private func featureRow(icon: String, title: String, desc: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color(red: 0.45, green: 0.6, blue: 1.0))
+                .frame(width: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text(desc)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
         }
     }
 
@@ -94,25 +200,14 @@ struct OnboardingView: View {
         return VStack(spacing: 28) {
             Spacer()
 
-            // 平台大图标
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: info.gradient,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 110, height: 110)
-                    .shadow(color: info.gradient[0].opacity(0.4), radius: 30)
-
-                Image(systemName: info.icon)
-                    .font(.system(size: 50, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-            .opacity(animStates[safe: index] ?? false ? 1 : 0)
-            .scaleEffect((animStates[safe: index] ?? false) ? 1 : 0.5)
+            // 平台真实 Logo
+            Image(info.logoName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 110, height: 110)
+                .shadow(color: info.gradient[0].opacity(0.4), radius: 25)
+                .opacity(animStates[safe: index] ?? false ? 1 : 0)
+                .scaleEffect((animStates[safe: index] ?? false) ? 1 : 0.5)
 
             // 平台名称
             Text(info.name)
@@ -225,9 +320,10 @@ struct OnboardingView: View {
                 HStack(spacing: 16) {
                     ForEach(selectedPlatforms, id: \.self) { p in
                         VStack(spacing: 4) {
-                            Image(systemName: platformInfo(p).icon)
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(Color(red: 0.45, green: 0.6, blue: 1.0))
+                            Image(platformInfo(p).logoName)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 28, height: 28)
                             Text(platformInfo(p).shortName)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -315,7 +411,7 @@ struct OnboardingView: View {
     private struct PlatformInfo {
         let name: String
         let shortName: String
-        let icon: String
+        let logoName: String
         let description: String
         let gradient: [Color]
     }
@@ -326,33 +422,33 @@ struct OnboardingView: View {
             return PlatformInfo(
                 name: "夸克网盘",
                 shortName: "夸克",
-                icon: "q.circle.fill",
+                logoName: "QuarkLogo",
                 description: "支持夸克分享链接解析与高速下载，需登录获取 Cookie",
-                gradient: [Color(red: 0.2, green: 0.6, blue: 1.0), Color(red: 0.1, green: 0.4, blue: 0.8)]
+                gradient: [Color(red: 0.1, green: 0.45, blue: 1.0), Color(red: 0.0, green: 0.32, blue: 0.8)]
             )
         case .baidu:
             return PlatformInfo(
                 name: "百度网盘",
                 shortName: "百度",
-                icon: "b.circle.fill",
+                logoName: "BaiduLogo",
                 description: "支持百度网盘分享链接解析下载，需登录获取 BDUSS",
-                gradient: [Color(red: 0.9, green: 0.4, blue: 0.2), Color(red: 0.7, green: 0.2, blue: 0.1)]
+                gradient: [Color(red: 0.16, green: 0.2, blue: 0.88), Color(red: 0.1, green: 0.12, blue: 0.72)]
             )
         case .pan123:
             return PlatformInfo(
                 name: "123 云盘",
                 shortName: "123",
-                icon: "1.circle.fill",
+                logoName: "Pan123Logo",
                 description: "支持 123 云盘分享链接解析下载，需登录获取 authorToken",
-                gradient: [Color(red: 0.1, green: 0.75, blue: 0.6), Color(red: 0.05, green: 0.55, blue: 0.45)]
+                gradient: [Color(red: 0.0, green: 0.78, blue: 0.59), Color(red: 0.0, green: 0.6, blue: 0.44)]
             )
         case .xunlei:
             return PlatformInfo(
                 name: "迅雷云盘",
                 shortName: "迅雷",
-                icon: "x.circle.fill",
+                logoName: "XunleiLogo",
                 description: "支持迅雷分享链接解析，当前版本游客模式即可使用",
-                gradient: [Color(red: 0.55, green: 0.3, blue: 0.9), Color(red: 0.35, green: 0.15, blue: 0.7)]
+                gradient: [Color(red: 0.1, green: 0.45, blue: 1.0), Color(red: 0.0, green: 0.32, blue: 0.8)]
             )
         }
     }
@@ -361,6 +457,7 @@ struct OnboardingView: View {
 // MARK: - 页面类型
 
 private enum OnboardingPage {
+    case intro
     case platform(Platform)
     case welcome
 }

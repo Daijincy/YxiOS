@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="quarkBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1A73FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0052CC;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- 背景圆 -->
+  <circle cx="60" cy="60" r="56" fill="url(#quarkBg)"/>
+  <!-- Q 形：外圆 -->
+  <circle cx="56" cy="54" r="26" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+  <!-- Q 尾巴 -->
+  <path d="M72 72 L86 88" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+</svg>

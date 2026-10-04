@@ -96,6 +96,8 @@ public struct LoginView: View {
             }
             .sheet(isPresented: $showWeb) {
                 WebLoginSheet(platform: selected)
+                    .presentationDetents([.height(520)])
+                    .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showManualCookie) {
                 ManualCookieSheet(platform: selected)
@@ -526,6 +528,10 @@ public final class WebLoginModel: ObservableObject {
         config.websiteDataStore = WKWebsiteDataStore.default()
         webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true
+        // 小窗口模式：禁用滚动，页面缩放适应窗口
+        webView.scrollView.isScrollEnabled = false
+        webView.scrollView.bounces = false
+        webView.contentMode = .scaleAspectFit
     }
 }
 
@@ -543,6 +549,13 @@ public struct CookieWebView: UIViewRepresentable {
     public func makeUIView(context: Context) -> WKWebView {
         // 必须在 load 之前设置 customUserAgent
         model.webView.customUserAgent = customUA
+        // 小窗口模式：页面加载后缩放适应（0.75 倍，PC 页面在小窗口里完整显示）
+        let zoomScript = WKUserScript(
+            source: "document.body.style.zoom='0.72'; document.documentElement.style.zoom='0.72';",
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+        model.webView.configuration.userContentController.addUserScript(zoomScript)
         model.webView.load(URLRequest(url: url))
         return model.webView
     }

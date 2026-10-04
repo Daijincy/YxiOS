@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="xunleiBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1A73FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0052CC;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- 背景圆 -->
+  <circle cx="60" cy="60" r="56" fill="url(#xunleiBg)"/>
+  <!-- 迅雷飞鸟：三个羽毛形状组成的飞鸟 -->
+  <!-- 上羽毛 -->
+  <path d="M38 50 Q55 30 82 38 Q70 42 60 50 Q50 56 38 50 Z" fill="#FFFFFF"/>
+  <!-- 中羽毛（主翼） -->
+  <path d="M32 62 Q55 48 88 58 Q72 62 58 68 Q46 72 32 62 Z" fill="#FFFFFF"/>
+  <!-- 下羽毛（尾） -->
+  <path d="M42 74 Q58 68 78 76 Q66 78 56 82 Q48 84 42 74 Z" fill="#FFFFFF" opacity="0.85"/>
+</svg>
