@@ -28,6 +28,8 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<!-- 网盘分享解析得到的直链可能是 http 而非 https，
 	     需允许任意加载，否则下载/预览会被 ATS 拦截 -->

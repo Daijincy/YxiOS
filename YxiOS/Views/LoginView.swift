@@ -49,9 +49,17 @@ public struct LoginView: View {
         _selected = State(initialValue: .quark)
     }
 
+    /// Tab 页使用，指定初始选中平台（Onboarding 引导后跳转）
+    public init(initialPlatform: Platform) {
+        self.initialPlatform = initialPlatform
+        self.isModal = false
+        _selected = State(initialValue: initialPlatform)
+    }
+
     public var body: some View {
         NavigationStack {
             ScrollView {
+                // 横屏适配：内容居中限宽，避免横屏时内容过宽
                 VStack(spacing: 16) {
                     Picker("平台", selection: $selected) {
                         ForEach(Platform.allCases) { p in
@@ -72,6 +80,8 @@ public struct LoginView: View {
                     clearButton
                 }
                 .padding()
+                .frame(maxWidth: 650)
+                .frame(maxWidth: .infinity)
             }
             .background(LiquidGlassBackground())
             .scrollContentBackground(.hidden)

@@ -52,6 +52,8 @@ public struct ResolveView: View {
                     }
                 }
                 .padding()
+                .frame(maxWidth: 650)
+                .frame(maxWidth: .infinity)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isParsing)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: parseError == nil)
             }
@@ -102,6 +104,7 @@ public struct ResolveView: View {
                                 .fill(Color(red: 0.45, green: 0.6, blue: 1.0).opacity(0.15))
                         )
                     }
+                    .buttonStyle(ScaleButtonStyle())
                     Button(action: { linkText = ""; passwordText = "" }) {
                         HStack(spacing: 4) {
                             Image(systemName: "xmark.circle")
@@ -116,6 +119,7 @@ public struct ResolveView: View {
                                 .fill(.white.opacity(0.06))
                         )
                     }
+                    .buttonStyle(ScaleButtonStyle())
                 }
                 GlassTextField("提取码（可选）",
                                text: $passwordText,
