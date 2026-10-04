@@ -29,14 +29,24 @@ public struct LoginView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let initialPlatform: Platform
+    private let isModal: Bool
     @State private var selected: Platform
     @State private var showWeb = false
     @State private var showManualCookie = false
     @State private var notice: String?
 
+    /// 模态使用（从解析页弹出，指定平台）
     public init(platform: Platform) {
         self.initialPlatform = platform
+        self.isModal = true
         _selected = State(initialValue: platform)
+    }
+
+    /// Tab 页使用（默认选夸克）
+    public init() {
+        self.initialPlatform = .quark
+        self.isModal = false
+        _selected = State(initialValue: .quark)
     }
 
     public var body: some View {
@@ -68,8 +78,10 @@ public struct LoginView: View {
             .navigationTitle("登录")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                if isModal {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("完成") { dismiss() }
+                    }
                 }
             }
             .sheet(isPresented: $showWeb) {

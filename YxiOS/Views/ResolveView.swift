@@ -57,6 +57,9 @@ public struct ResolveView: View {
             }
             .background(LiquidGlassBackground())
             .scrollContentBackground(.hidden)
+            .scrollDismissesKeyboard(.interactively)
+            // 点击空白处收起键盘
+            .onTapGesture { hideKeyboard() }
             .navigationTitle("云析 · 解析")
             .navigationDestination(for: FileEntry.self) { dir in
                 if let info = shareInfo {
@@ -83,15 +86,57 @@ public struct ResolveView: View {
                 GlassTextField("粘贴夸克 / 百度 / 123 / 迅雷分享链接",
                                text: $linkText,
                                systemImage: "link")
+                // 快捷按钮：粘贴 / 清除
+                HStack(spacing: 10) {
+                    Button(action: pasteFromClipboard) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.on.clipboard")
+                            Text("粘贴")
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color(red: 0.45, green: 0.6, blue: 1.0))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color(red: 0.45, green: 0.6, blue: 1.0).opacity(0.15))
+                        )
+                    }
+                    Button(action: { linkText = ""; passwordText = "" }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark.circle")
+                            Text("清除")
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(.white.opacity(0.06))
+                        )
+                    }
+                }
                 GlassTextField("提取码（可选）",
                                text: $passwordText,
                                systemImage: "key")
                 GlassButton("解析", systemImage: "magnifyingglass") {
+                    hideKeyboard()
                     Task { await performParse() }
                 }
                 .disabled(isParsing)
             }
         }
+    }
+
+    private func pasteFromClipboard() {
+        if let text = UIPasteboard.general.string {
+            linkText = text
+        }
+    }
+
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private var loadingCard: some View {
