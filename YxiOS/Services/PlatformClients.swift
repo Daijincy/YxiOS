@@ -453,10 +453,10 @@ final class BaiduClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
         let urlString = "https://pan.baidu.com/share/transfer?" + q
         var req = URLRequest(url: URL(string: urlString)!)
         req.httpMethod = "POST"
-        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/x-www-form-urlencoded; charset=UTF-8", forHTTPHeaderField: "Content-Type")
         req.setValue(uaWeb, forHTTPHeaderField: "User-Agent")
         req.setValue("https://pan.baidu.com", forHTTPHeaderField: "Origin")
-        req.setValue("https://pan.baidu.com/", forHTTPHeaderField: "Referer")
+        req.setValue("https://pan.baidu.com/s/", forHTTPHeaderField: "Referer")
         if let c = effectiveCookie(sekey: sekey) { req.setValue(c, forHTTPHeaderField: "Cookie") }
         req.httpBody = "fsidlist=%5B%22\(fsID)%22%5D&path=%2F".data(using: .utf8)
 
@@ -468,7 +468,13 @@ final class BaiduClient: PlatformClient, DirectURLProvider, @unchecked Sendable 
         guard errno == 0 else {
             throw YxiOSError.message(serverMessage(json, fallback: "百度：转存失败（errno=\(errno)）"))
         }
-        return json["extra"]?["list"]?.array?.first?["to"]?.string ?? "/"
+        // 转存后返回新文件的完整路径（to 字段），用于 locatedownload
+        let extra = json["extra"]?["list"]?.array?.first
+        let newPath = extra?["to"]?.string
+        guard let path = newPath, !path.isEmpty else {
+            throw YxiOSError.message("百度：转存成功但未返回文件路径")
+        }
+        return path
     }
 
     private func locatedownload(path: String, sekey: String?) async throws -> String {

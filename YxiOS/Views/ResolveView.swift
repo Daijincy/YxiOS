@@ -254,6 +254,10 @@ public struct ResolveView: View {
 
         shareInfo = info
         parseError = nil
+        // 提取码自动回填：解析到密码且用户未手动输入时，自动填充到密码框
+        if let pwd = info.password, !pwd.isEmpty, passwordText.isEmpty {
+            passwordText = pwd
+        }
 
         let client = PlatformRegistry.client(for: info.platform)
         if client.requiresLogin && loginSession.auth(for: info.platform) == nil {

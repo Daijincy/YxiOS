@@ -74,7 +74,9 @@ public struct LoginView: View {
                         xunleiCard
                     default:
                         // 内嵌 WebView 登录窗口（不弹出 sheet，直接嵌入当前界面）
+                        // .id(selected) 强制切换平台时重建整个视图，WebView 自动加载对应网盘的登录 URL
                         EmbeddedWebLogin(platform: selected)
+                            .id(selected)
                         // 手动输入兜底
                         manualInputRow
                     }
@@ -320,7 +322,8 @@ public struct EmbeddedWebLogin: View {
     private func sampleAndValidate() {
         switch platform {
         case .quark, .baidu:
-            let domain = (platform == .quark) ? "pan.quark.cn" : "pan.baidu.com"
+            // 百度 BDUSS 在 .baidu.com 域下（不是 .pan.baidu.com），必须用 baidu.com 过滤
+            let domain = (platform == .quark) ? "pan.quark.cn" : "baidu.com"
             WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
                 DispatchQueue.main.async {
                     let filtered = cookies.filter { $0.domain.contains(domain) }
@@ -382,7 +385,8 @@ public struct EmbeddedWebLogin: View {
     }
 
     private func grabCookie() {
-        let domain: String = (platform == .quark) ? "pan.quark.cn" : "pan.baidu.com"
+        // 百度 BDUSS 在 .baidu.com 域下（不是 .pan.baidu.com），必须用 baidu.com 过滤
+        let domain: String = (platform == .quark) ? "pan.quark.cn" : "baidu.com"
         WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
             DispatchQueue.main.async {
                 let filtered = cookies.filter { $0.domain.contains(domain) }
